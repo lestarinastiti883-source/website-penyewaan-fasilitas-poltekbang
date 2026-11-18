@@ -1,0 +1,35 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // GANTI dengan email akun pengelola (sama dengan ADMIN_EMAIL di firebase-config.js)
+    function isAdmin() {
+      return request.auth != null
+          && request.auth.token.email == 'website-penyewaan-fasilitas883@gmail.com';
+    }
+
+    // Jadwal terpesan: semua orang boleh melihat & membuat; hanya admin boleh mengubah/menghapus
+    match /slots/{id} {
+      allow read: if true;
+      allow create: if request.resource.data.keys().hasOnly(['nama','prod','tanggal','sesi','total','kode','dibuat'])
+                    && request.resource.data.total is number
+                    && request.resource.data.total >= 0
+                    && request.resource.data.total < 100000000;
+      allow update, delete: if isAdmin();
+    }
+
+    // Data pribadi penyewa (nama lengkap + WhatsApp): penyewa hanya bisa mengirim, TIDAK bisa membaca
+    match /kontak/{kode} {
+      allow create: if request.resource.data.keys().hasOnly(['nama','wa','prod','dibuat'])
+                    && request.resource.data.nama is string && request.resource.data.nama.size() < 80
+                    && request.resource.data.wa is string && request.resource.data.wa.size() < 20;
+      allow read, update, delete: if isAdmin();
+    }
+
+    // Status (menunggu/diterima/lunas/ditolak): semua orang boleh membaca; hanya admin boleh mengubah
+    match /status/{kode} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+  }
+}
